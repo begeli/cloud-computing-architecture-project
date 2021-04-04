@@ -1,0 +1,65 @@
+[PARSEC] Benchmarks to run:  splash2x.fft
+
+[PARSEC] [========== Running benchmark splash2x.fft [1] ==========]
+[PARSEC] Setting up run directory.
+[PARSEC] No archive for input 'native' available, skipping input setup.
+[PARSEC] Running 'time /parsec-benchmark/ext/splash2x/kernels/fft/inst/amd64-linux.gcc/bin/run.sh 4 native':
+[PARSEC] [---------- Beginning of output ----------]
+Generating input file ...
+Running /parsec-benchmark/ext/splash2x/kernels/fft/inst/amd64-linux.gcc/bin/fft -m28 -p4:
+
+FFT with Blocking Transpose
+   268435456 Complex Doubles
+   4 Processors
+   65536 Cache lines
+   16 Byte line size
+   4096 Bytes per page
+
+iter_num = 4096
+iter_num = 4096
+iter_num = 4096
+iter_num = 4096
+Transpose: iter_num = 0
+Transpose: iter_num = 16777216
+Transpose: iter_num = 33554432
+Transpose: iter_num = 50331648
+FFt1DOnce: iter_num = 114688
+Step 1: 10745544
+Step 2: 11355336
+Transpose: iter_num = 0
+Transpose: iter_num = 16777216
+Transpose: iter_num = 33554432
+Transpose: iter_num = 50331648
+Step 3:  2048828
+Step 4: 10675448
+Transpose: iter_num = 0
+Transpose: iter_num = 16777216
+Transpose: iter_num = 33554432
+Transpose: iter_num = 50331648
+Step 5:  1854188
+
+                 PROCESS STATISTICS
+            Computation      Transpose     Transpose
+ Proc          Time            Time        Fraction
+    0          36680904       14648560       0.39935
+
+                 TIMING INFORMATION
+Start time                        : 1617537287712533
+Initialization finish time        : 1617537327889932
+Overall finish time               : 1617537364570836
+Total time with initialization    :         76858303
+Total time without initialization :         36680904
+Overall transpose time            :         14648560
+Overall transpose fraction        :          0.39935
+
+
+real	1m17.566s
+user	2m27.659s
+sys	0m38.939s
+[PARSEC] [----------    End of output    ----------]
+[PARSEC]
+[PARSEC] BIBLIOGRAPHY
+[PARSEC]
+[PARSEC] [1] Woo et al. The SPLASH-2 Programs: Characterization and Methodological Considerations. ISCA, 1995.
+[PARSEC]
+[PARSEC] Done.
