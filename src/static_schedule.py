@@ -51,6 +51,7 @@ delete_jobs()
 
 # Schedule jobs
 location = "../parsec-benchmarks/part3/" # Change this variable to proper location if necessary.
+ 
 vm8jobs = ["parsec-ferret.yaml", "parsec-canneal.yaml", "parsec-dedup.yaml"]
 vm4jobs = ["parsec-freqmine.yaml", "parsec-blackscholes.yaml", "parsec-fft.yaml"]
 command = "kubectl create -f {}{}"
@@ -76,3 +77,4 @@ print("Completed scheduling jobs")
 
 command = "kubectl get pods"
 subprocess.run(command.split(" "))
+
