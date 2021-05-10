@@ -56,11 +56,14 @@ memcached_config = init_memcached_config()
 while(True):
     cpu_utilizations = psutil.cpu_percent(interval=None, percpu=True)
 
-    # If we are using one core and its utilization is over 90.% increase the number of cores to 2.
+    # If we are using one core and its utilization is over 90.0% increase the number of cores to 2.
     if memcached_config[1] == 1 and cpu_utilizations[0] > 90.0:
         memcached_config = set_memcached_cpu(memcached_config[0], 2)
-    # If we are using 2 cores and the average utilization of the cores is less than or equal to 65.0% switch to 1 core.
-    elif memcached_config[1] == 2 and ( ((cpu_utilizations[0] + cpu_utilizations[1]) / 2.0) <= 65.0):
+    # If we are using 2 cores and the average utilization of the cores is less than or equal to 60.0% switch to 1 core.
+    # Normally 55k QPS is the upper limit for memcache to handle requests without violating the SLO which is around 65.0% average CPU 
+    # utilization for two CPUs. We set the threshold for switching back to 1 CPU to 60.0% average CPU utilizations, so, for QPS around
+    # 55k the controller doesn't constantly switch between 1 CPU to 2 CPUs.
+    elif memcached_config[1] == 2 and ( ((cpu_utilizations[0] + cpu_utilizations[1]) / 2.0) <= 60.0):
         memcached_config = set_memcached_cpu(memcached_config[0], 1)
 
     sleep(1)
