@@ -5,13 +5,16 @@ import docker
 import subprocess
 
 '''
-The initial prototype of our controller.
+Third prototype of our controller.
 To use this file inside the VMs do the following instructions:
 1) Create a python file (i.e. controller.py) inside the VM.
 2) Copy the contents of this file into the file in VM.
 3) Download pip3/pip. (VMs we use have python3, so, you will probably have to download pip3.)
 4) Download psutil library using pip3/pip.
-5) Start executing the code.
+5) Download docker SDK with pip.
+6) Fix docker in the VM by following the instructions here: https://docs.docker.com/engine/install/linux-postinstall/
+7) Start executing the code.
+8) Cry
 Currently, the prototype successfully adjusts the number of cores according to the random load generated
 by mcperf. 
 Controller switches from 1 core to 2 cores when the core 0's CPU utilization exceeds 90.0%.
@@ -44,7 +47,91 @@ def set_memcached_cpu(pid, no_of_cpus):
     command = f'sudo taskset -a -cp {cpu_affinity} {pid}'
     subprocess.run(command.split(" "))
 
+
     return (pid, no_of_cpus)
+
+# Not quite what actual test-and-set does...
+def test_and_set_job(queue, container, client):
+    if ((not queue.empty()) and container.status == "exited"):
+        # Delete the container that stopped its execution.
+        print(f"Removing {container.name}")
+        client.containers.get(container.name).remove()
+
+        # Start the next job in the queue.
+        job = queue.get()
+        print(f"Running {job[1]}.")
+        return client.containers.run(cpuset_cpus=job[0], name=job[1], detach=True, auto_remove=False, image=job[2], command=job[3])
+
+    return container
+
+def test_and_delete_job(queue, container, client):
+    if (queue.empty() and container.status == "exited"):
+        # Delete the container that stopped its execution.
+        print(f"Removing {container.name}")
+        client.containers.get(container.name).remove()
+
+        return True
+
+    return False
+
+def switch_from_normal_to_high(isLastDeleted1, container1, isLastDeleted2, container2):
+    if not isLastDeleted1 and isLastDeleted2:
+        print("Changing cpu set of container 1 to 2 and 3.")
+        container1.update(cpuset_cpus="2,3")
+        container1.reload()
+    elif not isLastDeleted1 and container1.status != "paused":
+        print(f"Pausing {container1.name}")
+        container1.pause()
+        container1.reload()
+
+    # Unlikely scenario
+    if isLastDeleted1 and not isLastDeleted2:
+        container2.update(cpuset_cpus="2,3")
+        container2.reload()
+
+def switch_from_high_to_normal(isLastDeleted1, container1, isLastDeleted2, container2):
+    if not isLastDeleted1 and isLastDeleted2:
+        print("Changing cpu set of container 1 to 1,2 and 3.")
+        container1.update(cpuset_cpus="1-3")
+        if container1.status == "paused":
+            container1.unpause()
+
+        container1.reload()
+    elif not isLastDeleted1 and container1.status == "paused":
+        print(f"Unpausing {container1.name}")
+        container1.unpause()
+        container1.reload()
+
+    if isLastDeleted1 and not isLastDeleted2:
+        container2.update(cpuset_cpus="1-3")
+        container2.reload()
+
+def switch_to_critical_mode(isLastDeleted1, container1, isLastDeleted2, container2):
+    if not isLastDeleted1 and container1.status == "running":
+        print(f"Pausing {container1.name}")
+        container1.pause()
+        container1.reload()
+    if not isLastDeleted2 and container2.status == "running":
+        print(f"Pausing {container2.name}")
+        container2.pause()
+        container2.reload()
+
+def switch_to_high_mode(isLastDeleted1, container1, isLastDeleted2, container2):
+    if not isLastDeleted1 and isLastDeleted2 and container1.status == "paused":
+        print(f"Unpausing {container1.name}")
+        container1.unpause()
+        container1.reload()
+    if not isLastDeleted2 and container2.status == "paused":
+        print(f"Unpausing {container2.name}")
+        container2.unpause()
+        container2.reload()
+
+# Define load levels - Possible load levels memcache might have throughout its execution - Are there enums in python? :(
+NORMAL = "normal"
+HIGH = "high"
+CRITICAL = "critical"
+
+load_level = NORMAL # Initialize the load level to normal
 
 # Initialize client object for docker.
 client = docker.from_env()
@@ -80,10 +167,6 @@ memcached_config = init_memcached_config()
 
 # Setup is completed - start scheduling
 print("Creating containers!")
-#client.containers.get("dedup").remove()
-#client.containers.get("canneal").kill()
-#client.containers.get("canneal").remove()
-
 container1 = client.containers.create(cpuset_cpus=dedup[0], name=dedup[1], detach=True, auto_remove=False, image=dedup[2], command=dedup[3])
 container1.reload()
 
@@ -93,54 +176,31 @@ container2.reload()
 # Measure CPU utilization every 1.0 seconds. Adaptively change the CPU assignment of memcached based on load.
 while(True):
     cpu_utilizations = psutil.cpu_percent(interval=None, percpu=True)
+    cpu_util_avg = cpu_utilizations[0] if memcached_config[1] == 1 else (cpu_utilizations[0] + cpu_utilizations[1]) / 2.0
 
     # If we are using one core and its utilization is over 90.0% increase the number of cores to 2.
-    if memcached_config[1] == 1 and cpu_utilizations[0] > 90.0:
-        if not isLastDeleted1 and isLastDeleted2:
-            print("Changing cpu set of container 1 to 2 and 3.")
-            container1.update(cpuset_cpus="2,3")
-        elif not isLastDeleted1 and container1.status == "running":
-            print(f"Pausing {container1.name}")
-            container1.pause()
+    if memcached_config[1] == 1 and cpu_util_avg > 90.0:
+        switch_from_normal_to_high(isLastDeleted1, container1, isLastDeleted2, container2)
 
-        # Unlikely scenario
-        if isLastDeleted1 and not isLastDeleted2:
-            container2.update(cpuset_cpus="2,3")
-
+        load_level = HIGH
         memcached_config = set_memcached_cpu(memcached_config[0], 2)
     # If we are using 2 cores and the average utilization of the cores is less than or equal to 60.0% switch to 1 core.
     # Normally 55k QPS is the upper limit for memcache to handle requests without violating the SLO which is around 65.0% average CPU 
     # utilization for two CPUs. We set the threshold for switching back to 1 CPU to 60.0% average CPU utilizations, so, for QPS around
     # 55k the controller doesn't constantly switch between 1 CPU to 2 CPUs.
-    elif memcached_config[1] == 2 and ( ((cpu_utilizations[0] + cpu_utilizations[1]) / 2.0) <= 60.0):
+    elif memcached_config[1] == 2 and cpu_util_avg <= 60.0 and load_level != CRITICAL:
+        switch_from_high_to_normal(isLastDeleted1, container1, isLastDeleted2, container2)
+
+        load_level = NORMAL
         memcached_config = set_memcached_cpu(memcached_config[0], 1)
+    elif memcached_config[1] == 2 and cpu_util_avg >= 95.0 and load_level != CRITICAL:
+        switch_to_critical_mode(isLastDeleted1, container1, isLastDeleted2, container2)
 
-        if not isLastDeleted1 and isLastDeleted2:
-            print("Changing cpu set of container 1 to 1,2 and 3.")
-            container1.update(cpuset_cpus="1-3")
-        elif not isLastDeleted1 and container1.status == "paused":
-            print(f"Unpausing {container1.name}")
-            container1.unpause()
+        load_level = CRITICAL
+    elif memcached_config[1] == 2 and cpu_util_avg <= 90.0 and load_level == CRITICAL:
+        switch_to_high_mode(isLastDeleted1, container1, isLastDeleted2, container2)
 
-        if isLastDeleted1 and not isLastDeleted2:
-            container2.update(cpuset_cpus="1-3")
-
-'''
-    if memcached_config[1] == 2 and ( ((cpu_utilizations[0] + cpu_utilizations[1]) / 2.0) >= 95.0):
-        if not isLastDeleted1 and isLastDeleted2:
-            container1.pause()
-        elif isLastDeleted1 and not isLastDeleted2:
-            container2.pause()
-        elif not isLastDeleted1 and not isLastDeleted2:
-            container2.pause()
-    elif memcached_config[1] == 2 and ( ((cpu_utilizations[0] + cpu_utilizations[1]) / 2.0) <= 90.0):
-        if not isLastDeleted1 and isLastDeleted2 and container1.status == "paused":
-            container1.unpause()                    
-        elif isLastDeleted1 and not isLastDeleted2 and container2.status == "paused":
-            container2.unpause()
-        elif not isLastDeleted1 and not isLastDeleted2 and container2.status == "paused":
-            container2.unpause()
-'''
+        load_level = HIGH
 
     if (memcached_config[1] == 1 and container1.status == "created"):
         print(f"Starting {container1.name}")
@@ -150,37 +210,14 @@ while(True):
         print(f"Starting {container2.name}")
         container2.start()
 
-    if ((not queue1.empty()) and container1.status == "exited"):
-        # Delete the container that stopped its execution.
-        print(f"Removing {container1.name}")
-        client.containers.get(container1.name).remove()
+    # If the queue is not empty and the previous job finished its execution start running the next job.
+    if load_level != CRITICAL:
+        container1 = test_and_set_job(queue1, container1, client)
+        container2 = test_and_set_job(queue2, container2, client)
 
-        # Start the next job in the queue.
-        job = queue1.get()
-        print(f"Running {job[1]}.")
-        container1 = client.containers.run(cpuset_cpus=job[0], name=job[1], detach=True, auto_remove=False, image=job[2], command=job[3])
-
-    if ((not queue2.empty()) and container2.status == "exited"):
-        # Delete the container that stopped its execution.
-        print(f"Removing {container2.name}")
-        client.containers.get(container2.name).remove()
-
-        # Start the next job in the queue.
-        job = queue2.get()
-        print(f"Running {job[1]}.")
-        container2 = client.containers.run(cpuset_cpus=job[0], name=job[1], detach=True, auto_remove=False, image=job[2], command=job[3])
-
-    if (queue1.empty() and not isLastDeleted1 and container1.status == "exited"):
-        isLastDeleted1 = True
-        # Delete the container that stopped its execution.
-        print(f"Removing {container1.name}")
-        client.containers.get(container1.name).remove()
-
-    if (queue2.empty() and not isLastDeleted2 and container2.status == "exited"):
-        isLastDeleted2 = True
-        # Delete the container that stopped its execution.
-        print(f"Removing {container2.name}")
-        client.containers.get(container2.name).remove()
+    # If last jobs finished their execution remove their containers else do nothing.
+    isLastDeleted1 = True if isLastDeleted1 else test_and_delete_job(queue1, container1, client)
+    isLastDeleted2 = True if isLastDeleted2 else test_and_delete_job(queue2, container2, client)
 
     if not isLastDeleted1:
         container1.reload()
@@ -190,3 +227,5 @@ while(True):
 
     sleep(0.5)
 
+
+                                
