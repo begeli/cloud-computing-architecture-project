@@ -1,8 +1,9 @@
-from time import sleep
-from queue import Queue
-import psutil
-import docker
 import subprocess
+from queue import Queue
+from time import sleep
+
+import docker
+import psutil
 
 
 # Returns tuple with pid of memcached and number of cpus (=1)
@@ -25,12 +26,12 @@ def set_memcached_cpu(pid, no_of_cpus):
     print(f'Setting Memcached CPU affinity to {cpu_affinity}')
     command = f'sudo taskset -a -cp {cpu_affinity} {pid}'
     subprocess.run(command.split(" "))
-    return (pid, no_of_cpus)
+    return pid, no_of_cpus
+
 
 NORMAL = "normal"
 HIGH = "high"
 CRITICAL = "critical"
-
 
 # Initialize client object for docker.
 client = docker.from_env()
@@ -60,6 +61,7 @@ ferret = ("2,3",
         "anakli/parsec:ferret-native-reduced",
         "./bin/parsecmgmt -a run -p ferret -i native -n 2")
 
+
 def create_container(c_tuple):
     cont = client.containers.create(cpuset_cpus=dedup[0],
             name=c_tuple[1],
@@ -68,7 +70,8 @@ def create_container(c_tuple):
             image=c_tuple[2],
             command=c_tuple[3])
     cont.reload()
-    return container
+    return cont
+
 
 def hard_remove_container(cont):
     try:
@@ -79,49 +82,54 @@ def hard_remove_container(cont):
         if cont.status == "running":
             cont.kill()
         cont.remove()
-    except :
+    except:
         print("You fucked up the 'hard_remove thingy'")
 
+
 def remove_container(cont):
-    if (cont == None) return None
+    if cont is None:
+        return None
     try:
         cont.remove()
-    except :
+    except:
         hard_remove_container(cont)
     return None
 
+
 def remove_if_done_container(cont):
-    if (cont == None) return None
+    if cont is None:
+        return None
     cont.reload()
-    if (cont.status == "exited"):
+    if cont.status == "exited":
         return remove_container(cont)
+    else:
+        raise NotImplementedError("IMPLEMENT ME???")
 
 
 def pause_container(cont):
-    if (cont == None) return
+    if cont is None: return
     try:
         cont.reload()
         if cont.status in ["running", "restarting"]:
             cont.pause()
-    except :
+    except:
         print("something seems to have gone wrong while PAUSING the container (But dont care)")
 
 
 def unpause_container(cont):
-    if (cont == None) return
+    if cont is None: return
     cont.reload()
-    if (cont.status == "paused")
+    if cont.status == "paused":
         cont.unpause()
-
 
 
 def main():
     # Queue for CPU1 (1 cores [1])
-    queue1 = Queue(maxsize = 6)
+    queue1 = Queue(maxsize=6)
     container1 = None
 
     # Queue for CPU2 (2 cores [2,3])
-    queue2 = Queue(maxsize = 6)
+    queue2 = Queue(maxsize=6)
     container2 = None
 
     queue1.put(fft)
@@ -135,9 +143,9 @@ def main():
     mc_pid, mc_ncpus = init_memcached_config()
 
     running = True
-    load_level = NORMAL # Initialize the load level to normal
+    load_level = NORMAL  # Initialize the load level to normal
 
-    while(running):
+    while running:
         cpu_utilizations = psutil.cpu_percent(interval=None, percpu=True)
         cpu_util_avg = cpu_utilizations[0]  \
                 if mc_ncpus == 1 \
@@ -151,7 +159,7 @@ def main():
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 2)
 
                 # Update containers
-                if (queue2.empty() and container2 is None):
+                if queue2.empty() and container2 is None:
                     container1.update(cpuset_cpus="2,3")
                     # container1.reload()
                 else:
@@ -166,13 +174,11 @@ def main():
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 1)
 
                 # Update containers
-                if (container1 is not None):
+                if container1 is not None:
                     unpause_container(container1)
-                elif (queue1.empty()):
+                elif queue1.empty():
                     # maybe we would want to start a second job here.
                     container2.update(cpuset_cpus="1-3")
-
-
 
             elif cpu_util_avg >= 95.0:
                 # stop all containers
@@ -181,13 +187,12 @@ def main():
                 pause_container(container1)
                 pause_container(container2)
 
-
         elif load_level == CRITICAL:
             if cpu_util_avg <= 90:
                 # restart containers
                 load_level = HIGH
 
-                if (container2 is None and queue2.empty()):
+                if container2 is None and queue2.empty():
                     unpause_container(container1)
                 else:
                     unpause_container(container2)
@@ -198,19 +203,18 @@ def main():
 
         # Start containers.
         if load_level != CRITICAL:
-            if (container2 is None and not queue2.empty()):
-                container2 = createContainer(queue2.get())
+            if container2 is None and not queue2.empty():
+                container2 = create_container(queue2.get())
                 container2.start()
         if load_level == NORMAL:
-            if (container1 is None and not queue2.empty()):
-                container1 = createContainer(queue1.get())
+            if container1 is None and not queue2.empty():
+                container1 = create_container(queue1.get())
                 container1.start()
 
         if queue1.empty() and queue2.empty and container1 is None and container2 is None:
             print("all other jobs have been completed")
 
         sleep(0.5)
-
 
 
 if __name__ == "__main__":
