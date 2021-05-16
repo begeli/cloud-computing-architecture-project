@@ -131,10 +131,12 @@ def main():
     # Queue for CPU2 (2 cores [2,3])
     queue2 = Queue(maxsize=6)
     container2 = None
-
+    
+    queue1.put(dedup)
     queue1.put(fft)
     queue1.put(blackscholes)
 
+    queue2.put(canneal)
     queue2.put(freqmine)
     queue2.put(ferret)
 
