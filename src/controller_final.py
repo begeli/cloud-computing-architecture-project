@@ -28,7 +28,6 @@ def set_memcached_cpu(pid, no_of_cpus):
     subprocess.run(command.split(" "))
     return pid, no_of_cpus
 
-
 NORMAL = "normal"
 HIGH = "high"
 CRITICAL = "critical"
@@ -61,9 +60,8 @@ ferret = ("2,3",
         "anakli/parsec:ferret-native-reduced",
         "./bin/parsecmgmt -a run -p ferret -i native -n 2")
 
-
 def create_container(c_tuple):
-    cont = client.containers.create(cpuset_cpus=dedup[0],
+    cont = client.containers.create(cpuset_cpus=c_tuple[0],
             name=c_tuple[1],
             detach=True,
             auto_remove=False,
@@ -74,6 +72,7 @@ def create_container(c_tuple):
 
 
 def hard_remove_container(cont):
+    if cont is None: return
     try:
         cont.reload()
         if cont.status == "paused":
@@ -88,8 +87,10 @@ def hard_remove_container(cont):
 
 def remove_container(cont):
     if cont is None:
+        #print("Inside remove container. Returning none.")
         return None
     try:
+        #print(f"Removed {cont.name}.")
         cont.remove()
     except:
         hard_remove_container(cont)
@@ -98,12 +99,16 @@ def remove_container(cont):
 
 def remove_if_done_container(cont):
     if cont is None:
+        #print("Inside remove if done, returning none.")
         return None
     cont.reload()
     if cont.status == "exited":
+        #print(f"Removing {cont.name} because it is done.")
         return remove_container(cont)
-    else:
-        raise NotImplementedError("IMPLEMENT ME???")
+
+    return cont
+    #else:
+    #    raise NotImplementedError("IMPLEMENT ME???")
 
 
 def pause_container(cont):
@@ -122,8 +127,43 @@ def unpause_container(cont):
     if cont.status == "paused":
         cont.unpause()
 
+def update_container(cont, cpu_set):
+    if cont is None:
+        return
+    if cont.status == "exited":
+        return
+
+    cont.update(cpuset_cpus=cpu_set)
+
+def hard_remove_everything():
+    try:
+        hard_remove_container(client.containers.get("dedup"))
+    except:
+        print("Dedup already didn't exist.")
+    try:
+        hard_remove_container(client.containers.get("splash2x-fft"))
+    except:
+        print("FFT already didn't exist.")
+    try:
+        hard_remove_container(client.containers.get("blackscholes"))
+    except:
+        print("Blackscholes already didn't exist.")
+    try:
+        hard_remove_container(client.containers.get("canneal"))
+    except:
+        print("Canneal already didn't exist.")
+    try:
+        hard_remove_container(client.containers.get("freqmine"))
+    except:
+        print("Freqmine already didn't exist.")
+    try:
+        hard_remove_container(client.containers.get("ferret"))
+    except:
+        print("Ferret already didn't exist.")
 
 def main():
+    hard_remove_everything()
+
     # Queue for CPU1 (1 cores [1])
     queue1 = Queue(maxsize=6)
     container1 = None
@@ -131,7 +171,7 @@ def main():
     # Queue for CPU2 (2 cores [2,3])
     queue2 = Queue(maxsize=6)
     container2 = None
-    
+
     queue1.put(dedup)
     queue1.put(fft)
     queue1.put(blackscholes)
@@ -139,6 +179,7 @@ def main():
     queue2.put(canneal)
     queue2.put(freqmine)
     queue2.put(ferret)
+
 
     # Discard first measurement, since it is always wrong.
     psutil.cpu_percent(interval=None, percpu=True)
@@ -161,11 +202,18 @@ def main():
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 2)
 
                 # Update containers
-                if queue2.empty() and container2 is None:
-                    container1.update(cpuset_cpus="2,3")
+                if queue2.empty() and container2 is None and container1 is not None:
+                    print(f"Updating CPU set of {container1.name} to 2,3")
+                    update_container(container1, "2,3")
+                    #container1.update(cpuset_cpus="2,3")
                     # container1.reload()
                 else:
                     pause_container(container1)
+
+                if queue1.empty() and container1 is None and container2 is not None:
+                    print(f"Updating CPU set of {container2.name} to 2,3")
+                    update_container(container2, "2,3")
+                    #container2.update(cpuset_cpus="2,3")
 
         elif load_level == HIGH:
             if cpu_util_avg <= 60:
@@ -176,11 +224,18 @@ def main():
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 1)
 
                 # Update containers
-                if container1 is not None:
+                if queue2.empty() and container2 is None and container1 is not None:
+                    print(f"Updating CPU set of {container1.name} to 1-3")
+                    update_container(container1, "1-3")
+                    #container1.update(cpuset_cpus="1-3")
+                    # container1.reload()
+                else:
                     unpause_container(container1)
-                elif queue1.empty():
-                    # maybe we would want to start a second job here.
-                    container2.update(cpuset_cpus="1-3")
+
+                if queue1.empty() and container1 is None and container2 is not None:
+                    print(f"Updating CPU set of {container2.name} to 1-3")
+                    update_container(container2, "1-3")
+                    #container2.update(cpuset_cpus="1-3")
 
             elif cpu_util_avg >= 95.0:
                 # stop all containers
@@ -207,18 +262,29 @@ def main():
         if load_level != CRITICAL:
             if container2 is None and not queue2.empty():
                 container2 = create_container(queue2.get())
+                print(f"Starting {container2.name}")
                 container2.start()
         if load_level == NORMAL:
-            if container1 is None and not queue2.empty():
+            if container1 is None and not queue1.empty():
                 container1 = create_container(queue1.get())
+                print(f"Starting {container1.name}")
                 container1.start()
 
         if queue1.empty() and queue2.empty and container1 is None and container2 is None:
             print("all other jobs have been completed")
+            set_memcached_cpu(mc_pid, 2)
+            break
 
-        sleep(0.5)
-
+        sleep(0.25)
 
 if __name__ == "__main__":
     # execute only if run as a script
     main()
+
+
+
+
+
+
+
+
