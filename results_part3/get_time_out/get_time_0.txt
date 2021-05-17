@@ -1,0 +1,15 @@
+seromka@MacBook-Pro cloud-comp-arch-project % python3 get_time.py results.json
+Job:  parsecblackscholes
+Job time:  0:02:51
+Job:  parseccanneal
+Job time:  0:04:39
+Job:  parsecdedup
+Job time:  0:00:20
+Job:  parsecferret
+Job time:  0:04:12
+Job:  parsecfreqmine
+Job time:  0:03:11
+Job:  parsec-splash2x-fft
+Job time:  0:02:09
+Job:  memcached
+Total time: 0:06:33
