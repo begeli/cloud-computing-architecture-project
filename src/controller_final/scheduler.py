@@ -37,8 +37,14 @@ class ContainerScheduler:
         return len(self.__queue3) > self.__running[2]
 
     def NORMAL_to_HIGH(self):
+        print("switching to HIGH")
         self.__load_level = HIGH
         if self.__running == [0, 0, 1]:
+            # If there are only jobs in q3 left, we don't want want to stop it.
+            if not self.__queue1 and not self.__queue2:
+                update_container(self.__queue3[0], "2,3")
+                return
+
             pause_container(self.__queue3[0])
             if self.__queue2:
                 start_or_unpause_container(self.__queue2[0])
@@ -50,13 +56,18 @@ class ContainerScheduler:
                 if len(self.__queue1) >= 2:
                     start_or_unpause_container(self.__queue1[1])
                     self.__running = [2, 0, 0]
+
         elif self.__running == [1, 1, 0]:
             pause_container(self.__queue1[0])
             self.__running = [0, 1, 0]
 
-        print("switched to HIGH")
+        elif self.__running == [3, 0, 0]:
+            pause_container(self.__queue1[2])
+            self.__running = [2, 0, 0]
+
 
     def HIGH_to_NORMAL(self):
+        print("switching to NORMAL")
         self.__load_level = NORMAL
         if self.__running == [0, 1, 0]:
             if self.__queue3:
@@ -76,9 +87,13 @@ class ContainerScheduler:
                 start_or_unpause_container(self.__queue1[2])
                 self.__running = [3, 0, 0]
 
-        print("switched to NORMAL")
+        # This is a special case when all other jobs are done.
+        elif self.__running == [0, 0, 1]:
+            update_container(self.__queue3[0], "1,2,3")
+
 
     def HIGH_to_CRITICAL(self):
+        print("switching to CRITICAL")
         self.__load_level = CRITICAL
         # allow memcached to use all cpus.
         if self.__running == [0, 1, 0]:
@@ -88,11 +103,13 @@ class ContainerScheduler:
             pause_container(self.__queue1[1])
         elif self.__running == [1, 0, 0]:
             pause_container(self.__queue1[0])
+        elif self.__running == [0, 0, 1]:
+            pause_container(self.__queue3[0])
         self.__running = [0, 0, 0]
 
-        print("switched to CRITICAL")
 
     def CRITICAL_to_HIGH(self):
+        print("switching to HIGH")
         self.__load_level = HIGH
         if self.__queue2:
             unpause_container(self.__queue2[0])
@@ -103,8 +120,10 @@ class ContainerScheduler:
             if len(self.__queue1) >= 2:
                 unpause_container(self.__queue1[1])
                 self.__running = [2, 0, 0]
+        elif self.__queue3:
+            unpause_container(self.__queue3[0])
+            self.__running = [0, 0, 1]
 
-        print("switched to HIGH")
 
     def REMOVE_EXITED_CONTAINERS(self):
         # Remove exited containers.
@@ -153,13 +172,20 @@ class ContainerScheduler:
                 start_or_unpause_container(self.__queue1[self.__running[0]])
                 self.__running[0] += 1
 
+            # If we still didn't schedule anything, just schedule queue3.
+            if self.get_core_usage() == 0 and self.__queue3:
+                start_or_unpause_container(self.__queue3[0])
+                update_container(self.__queue3[0], "2,3")
+                self.__running = [0, 0, 1]
+
+
     def DONE(self):
-        return self.__running == [0,0,0] and not self.__queue1 and not self.__queue2 and not self.__queue3
+        return self.__running == [0, 0, 0] and not self.__queue1 and not self.__queue2 and not self.__queue3
 
     def print_queues(self):
         print("queue1", [c.name for c in self.__queue1], end="  ")
         print("queue2", [c.name for c in self.__queue2], end="  ")
-        print("queue3", [c.name for c in self.__queue3], end=50*" "+"\r")
+        print("queue3", [c.name for c in self.__queue3], end=50 * " " + "\r")
 
 
 # Docker helper functions.
