@@ -74,6 +74,7 @@ def main():
 
     logger = Logger(args.log_path)
     sched = scheduler.ContainerScheduler(q1_conf, q2_conf, q3_conf, logger)
+    signal.signal(signal.SIGINT, handle_signal, sched)
 
     # Discard first measurement, since it is always wrong.
     psutil.cpu_percent(interval=None, percpu=True)
@@ -126,13 +127,12 @@ def main():
         sleep(0.5)
 
 
-def handle_signal(sig, frame):
+def handle_signal(sig, frame, sched):
     print("aborting...")
-    scheduler.hard_remove_everything()
+    sched.hard_remove_everything()
     sys.exit(0)
 
 
 if __name__ == "__main__":
     # execute only if run as a script
-    signal.signal(signal.SIGINT, handle_signal)
     main()
