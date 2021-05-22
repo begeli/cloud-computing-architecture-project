@@ -44,27 +44,27 @@ def set_memcached_cpu(pid, no_of_cpus, logger):
     return pid, no_of_cpus
 
 
-dedup = ("1,2,3",
+dedup = ("0,1,2,3",
          "dedup",
          "anakli/parsec:dedup-native-reduced",
          "./bin/parsecmgmt -a run -p dedup -i native -n 1")
-fft = ("1,2,3",
+fft = ("0,1,2,3",
        "splash2x-fft",
        "anakli/parsec:splash2x-fft-native-reduced",
        "./bin/parsecmgmt -a run -p splash2x.fft -i native -n 1")
-blackscholes = ("1,2,3",
+blackscholes = ("0,1,2,3",
                 "blackscholes",
                 "anakli/parsec:blackscholes-native-reduced",
                 "./bin/parsecmgmt -a run -p blackscholes -i native -n 2")
-canneal = ("2,3",
+canneal = ("0,1,2,3",
            "canneal",
            "anakli/parsec:canneal-native-reduced",
            "./bin/parsecmgmt -a run -p canneal -i native -n 2")
-freqmine = ("2,3",
+freqmine = ("0,1,2,3",
             "freqmine",
             "anakli/parsec:freqmine-native-reduced",
             "./bin/parsecmgmt -a run -p freqmine -i native -n 2")
-ferret = ("1,2,3",
+ferret = ("0,1,2,3",
           "ferret",
           "anakli/parsec:ferret-native-reduced",
           "./bin/parsecmgmt -a run -p ferret -i native -n 3")
@@ -84,45 +84,67 @@ def main():
 
     # Discard first measurement, since it is always wrong.
     psutil.cpu_percent(interval=None, percpu=True)
-
     mc_pid, mc_ncpus = init_memcached_config(logger)
-    n_threads = 1
+
+    mc_proc = psutil.Process(mc_pid)
+    # n_cores = 4
+
     i = 0
     while True:
         if i == 0:
             sched.print_queues()
-        i= (i + 1)%20
+        i = (i + 1) % 20
 
+        mc_utilization = mc_proc.cpu_percent()
         cpu_utilizations = psutil.cpu_percent(interval=None, percpu=True)
-        cpu_util_avg = sum(cpu_utilizations[:n_threads]) / n_threads
+        cpu_util_total = sum(cpu_utilizations)
 
-        if sched.get_load_level() == scheduler.NORMAL:
-            if cpu_util_avg > 90.0:
-                n_threads = 2
-                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
-                sched.NORMAL_to_HIGH()
-        elif sched.get_load_level() == scheduler.HIGH:
-            if cpu_util_avg <= 40:
-                # change to 1 core
-                n_threads = 1
-                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
-                sched.HIGH_to_NORMAL()
-            elif cpu_util_avg >= 95.0:
-                # stop all containers
-                n_threads = 4
-                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
-                sched.HIGH_to_CRITICAL()
-        elif sched.get_load_level() == scheduler.CRITICAL:
-            if cpu_util_avg <= 40:
-                n_threads = 2
-                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
-                sched.CRITICAL_to_HIGH()
+        if cpu_util_total < 50:
+            sched.add(4)
+
+        elif cpu_util_total < 100:
+            sched.add(3)
+
+        elif cpu_util_total < 200:
+            sched.add(2)
+        elif cpu_util_total < 300:
+            sched.add(1)
+
+        elif cpu_util_total > 380:
+            if mc_utilization > 90:
+                # reduce to 2 cores
+                sched.remove(sched.get_load_level() - 2)
+            if mc_utilization > 180:
+                # reduce to 1 core
+                sched.remove(sched.get_load_level() - 1)
+
+        # if sched.get_load_level() == scheduler.NORMAL:
+        #     if cpu_util_avg > 90.0:
+        #         n_threads = 2
+        #         mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
+        #         sched.NORMAL_to_HIGH()
+        # elif sched.get_load_level() == scheduler.HIGH:
+        #     if cpu_util_avg <= 40:
+        #         # change to 1 core
+        #         n_threads = 1
+        #         mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
+        #         sched.HIGH_to_NORMAL()
+        #     elif cpu_util_avg >= 95.0:
+        #         # stop all containers
+        #         n_threads = 4
+        #         mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
+        #         sched.HIGH_to_CRITICAL()
+        # elif sched.get_load_level() == scheduler.CRITICAL:
+        #     if cpu_util_avg <= 40:
+        #         n_threads = 2
+        #         mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
+        #         sched.CRITICAL_to_HIGH()
 
         # Remove containers if they are done.
         sched.REMOVE_EXITED_CONTAINERS()
 
         # Start containers.
-        sched.SCHEDULE_NEXT()
+        # sched.SCHEDULE_NEXT()
 
         if sched.DONE():
             print("all other jobs have been completed")
@@ -130,7 +152,7 @@ def main():
             logger.log_end()
             break
 
-        sleep(0.5)
+        sleep(0.25)
 
 
 if __name__ == "__main__":

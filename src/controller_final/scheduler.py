@@ -148,6 +148,61 @@ class ContainerScheduler:
                 self.__queue3.pop(0)
                 self.__running[2] = 0
 
+    def get_best_distribution(self, max):
+        if max >= 4:
+            if self.__queue3 and self.__queue1:
+                return [3,1]
+            if len(self.__queue2) >= 2:
+                return [2,2]
+            if self.__queue2 and len(self.__queue1) >= 2:
+                return [2,1,1]
+            if len(self.__queue1) >= 4:
+                return [1,1,1,1]
+
+        if max >= 3:
+            if self.__queue3:
+                return [3]
+            if self.__queue2 and self.__queue1:
+                return [2,1]
+            if len(self.__queue1) >= 3:
+                return [1,1,1]
+
+        if max >= 2:
+            if self.__queue2:
+                return [2]
+            if len(self.__queue1) >= 2:
+                return [1,1]
+
+        if max >= 1:
+            if self.__queue1:
+                return [1]
+
+    def add(self, n_containers):
+        for q in self.get_best_distribution(n_containers):
+            if q == 3:
+                self.start_or_unpause_container(self.__queue3[self.__running[2]-1])
+                self.__running[2] += 1
+            if q == 2:
+                self.start_or_unpause_container(self.__queue2[self.__running[1]-1])
+                self.__running[1] += 1
+            if q == 1:
+                self.start_or_unpause_container(self.__queue1[self.__running[0]-1])
+                self.__running[0] += 1
+
+    def remove(self, n_containers):
+        if n_containers <= 0:
+            return
+        weight = 3
+        queues = [self.__queue1, self.__queue2, self.__queue3]
+        for n in reversed(self.__running):
+            for i in reversed(range(0, self.__running[weight-1])):
+                if n_containers > weight:
+                    n_containers -= weight
+                    self.__running[weight-1] -= 1
+                    self.pause_container(queues[weight-1][i])
+
+
+
     def SCHEDULE_NEXT(self):
         if self.__load_level == NORMAL:
             if self.get_core_usage() == 0 and self.can_schedule_queue3():
@@ -228,7 +283,7 @@ class ContainerScheduler:
         cont.reload()
         if cont.status == "exited":
             # print(f"Removing {cont.name} because it is done.")
-            self.__logger.log_container_event(cont.name)
+            self.__logger.log_container_event(cont.name, 'FINISH')
             self.remove_container(cont)
             return True
 
@@ -304,3 +359,4 @@ class ContainerScheduler:
             self.hard_remove_container(self.__client.containers.get("ferret"))
         except:
             print("Tried to remove Ferret, but didn't exist.")
+
