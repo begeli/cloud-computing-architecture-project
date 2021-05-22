@@ -67,6 +67,7 @@ def main():
     psutil.cpu_percent(interval=None, percpu=True)
 
     mc_pid, mc_ncpus = init_memcached_config()
+    n_threads = 1
     i = 0
     while True:
         if i == 0:
@@ -74,25 +75,28 @@ def main():
         i= (i + 1)%20
 
         cpu_utilizations = psutil.cpu_percent(interval=None, percpu=True)
-        cpu_util_avg = (cpu_utilizations[0] + cpu_utilizations[1]) / 2.0
-        cpu_util_one = cpu_utilizations[0]
+        cpu_util_avg = sum(cpu_utilizations[:n_threads]) / n_threads
 
         if sched.get_load_level() == scheduler.NORMAL:
-            if cpu_util_one > 90.0:
-                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 2)
+            if cpu_util_avg > 90.0:
+                n_threads = 2
+                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads)
                 sched.NORMAL_to_HIGH()
         elif sched.get_load_level() == scheduler.HIGH:
             if cpu_util_avg <= 60:
                 # change to 1 core
-                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 1)
+                n_threads = 1
+                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads)
                 sched.HIGH_to_NORMAL()
             elif cpu_util_avg >= 95.0:
                 # stop all containers
-                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 4)
+                n_threads = 4
+                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads)
                 sched.HIGH_to_CRITICAL()
         elif sched.get_load_level() == scheduler.CRITICAL:
-            if cpu_util_avg <= 90:
-                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 2)
+            if cpu_util_avg <= 40:
+                n_threads = 2
+                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads)
                 sched.CRITICAL_to_HIGH()
 
         # Remove containers if they are done.
