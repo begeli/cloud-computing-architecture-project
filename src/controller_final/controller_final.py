@@ -3,6 +3,8 @@ from time import sleep
 
 import psutil
 import scheduler
+import signal
+import sys
 
 
 # Returns tuple with pid of memcached and number of cpus (=1)
@@ -113,6 +115,13 @@ def main():
         sleep(0.25)
 
 
+def handle_signal(sig, frame):
+    print("aborting...")
+    scheduler.hard_remove_everything()
+    sys.exit(0)
+
+
 if __name__ == "__main__":
     # execute only if run as a script
+    signal.signal(signal.SIGINT, handle_signal)
     main()
