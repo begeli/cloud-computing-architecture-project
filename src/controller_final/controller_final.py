@@ -1,4 +1,5 @@
 import argparse
+import functools
 import subprocess
 from time import sleep
 
@@ -12,6 +13,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--log_path", dest='log_path')
 args = parser.parse_args()
 
+
+def handle_signal(sched, sig, frame):
+    print("aborting...")
+    sched.hard_remove_everything()
+    sys.exit(0)
 
 
 # Returns tuple with pid of memcached and number of cpus (=1)
@@ -74,7 +80,7 @@ def main():
 
     logger = Logger(args.log_path)
     sched = scheduler.ContainerScheduler(q1_conf, q2_conf, q3_conf, logger)
-    signal.signal(signal.SIGINT, handle_signal, sched)
+    signal.signal(signal.SIGINT, functools.partial(handle_signal, sched))
 
     # Discard first measurement, since it is always wrong.
     psutil.cpu_percent(interval=None, percpu=True)
@@ -125,12 +131,6 @@ def main():
             break
 
         sleep(0.5)
-
-
-def handle_signal(sig, frame, sched):
-    print("aborting...")
-    sched.hard_remove_everything()
-    sys.exit(0)
 
 
 if __name__ == "__main__":
