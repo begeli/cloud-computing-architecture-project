@@ -112,7 +112,7 @@ def main():
             set_memcached_cpu(mc_pid, 4)
             break
 
-        sleep(0.25)
+        sleep(0.5)
 
 
 def handle_signal(sig, frame):
