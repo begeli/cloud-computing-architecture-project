@@ -39,7 +39,7 @@ fft = ("1,2,3",
 blackscholes = ("1,2,3",
                 "blackscholes",
                 "anakli/parsec:blackscholes-native-reduced",
-                "./bin/parsecmgmt -a run -p blackscholes -i native -n 1")
+                "./bin/parsecmgmt -a run -p blackscholes -i native -n 2")
 canneal = ("2,3",
            "canneal",
            "anakli/parsec:canneal-native-reduced",
@@ -57,8 +57,8 @@ ferret = ("1,2,3",
 
 def main():
 
-    q1_conf = [dedup, fft, blackscholes]
-    q2_conf = [canneal, freqmine]
+    q1_conf = [dedup, fft]
+    q2_conf = [canneal, freqmine, blackscholes]
     q3_conf = [ferret]
 
     sched = scheduler.ContainerScheduler(q1_conf, q2_conf, q3_conf)
