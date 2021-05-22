@@ -32,7 +32,7 @@ def init_memcached_config(logger):
             break
 
     # Set the cpu affinity of memcached to CPU 0
-    return set_memcached_cpu(pid, 4, logger)
+    return set_memcached_cpu(pid, 1, logger)
 
 
 def set_memcached_cpu(pid, no_of_cpus, logger):
