@@ -1,6 +1,7 @@
 import docker
 
 NORMAL = "normal"
+MEDIUM = "medium"
 HIGH = "high"
 CRITICAL = "critical"
 
@@ -42,7 +43,15 @@ class ContainerScheduler:
     def can_schedule_queue3(self):
         return len(self.__queue3) > self.__running[2]
 
-    def NORMAL_to_HIGH(self):
+    def NORMAL_to_MEDIUM(self):
+        print("switching to MEDIUM")
+        self.__load_level = MEDIUM
+
+    def MEDIUM_to_NORMAL(self):
+        print("switching to NORMAL")
+        self.__load_level = NORMAL
+
+    def MEDIUM_to_HIGH(self):
         print("switching to HIGH")
         self.__load_level = HIGH
         if self.__running == [0, 0, 1]:
@@ -71,8 +80,8 @@ class ContainerScheduler:
             self.pause_container(self.__queue1[2])
             self.__running = [2, 0, 0]
 
-    def HIGH_to_NORMAL(self):
-        print("switching to NORMAL")
+    def HIGH_to_MEDIUM(self):
+        print("switching to MEDIUM")
         self.__load_level = NORMAL
         if self.__running == [0, 1, 0]:
             if self.__queue3:

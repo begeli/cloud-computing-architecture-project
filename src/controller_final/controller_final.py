@@ -55,7 +55,7 @@ fft = ("1,2,3",
 blackscholes = ("1,2,3",
                 "blackscholes",
                 "anakli/parsec:blackscholes-native-reduced",
-                "./bin/parsecmgmt -a run -p blackscholes -i native -n 2")
+                "./bin/parsecmgmt -a run -p blackscholes -i native -n 1")
 canneal = ("2,3",
            "canneal",
            "anakli/parsec:canneal-native-reduced",
@@ -74,8 +74,8 @@ def main():
     if not args.log_path or args.log_path is None:
         raise ValueError("please provide --log_path PATH_TO_LOG_FILE.")
 
-    q1_conf = [dedup, fft]
-    q2_conf = [canneal, freqmine, blackscholes]
+    q1_conf = [dedup, fft, blackscholes]
+    q2_conf = [canneal, freqmine]
     q3_conf = [ferret]
 
     logger = Logger(args.log_path)
@@ -91,27 +91,38 @@ def main():
     while True:
         if i == 0:
             sched.print_queues()
-        i= (i + 1)%20
+        i = (i + 1) % 20
 
         cpu_utilizations = psutil.cpu_percent(interval=None, percpu=True)
         cpu_util_avg = sum(cpu_utilizations[:n_threads]) / n_threads
+        cpu_util_zero = cpu_utilizations[0]
 
         if sched.get_load_level() == scheduler.NORMAL:
-            if cpu_util_avg > 90.0:
+            if cpu_util_zero > 90.0:
                 n_threads = 2
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
-                sched.NORMAL_to_HIGH()
+                sched.NORMAL_to_MEDIUM()
+
+        elif sched.get_load_level() == scheduler.MEDIUM:
+            if cpu_util_zero > 90.0:
+                sched.MEDIUM_to_HIGH()
+            if cpu_util_zero < 50.0:
+                n_threads = 1
+                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
+                sched.MEDIUM_to_NORMAL()
+
         elif sched.get_load_level() == scheduler.HIGH:
             if cpu_util_avg <= 40:
                 # change to 1 core
                 n_threads = 1
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
-                sched.HIGH_to_NORMAL()
+                sched.HIGH_to_MEDIUM()
             elif cpu_util_avg >= 95.0:
                 # stop all containers
                 n_threads = 4
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
                 sched.HIGH_to_CRITICAL()
+
         elif sched.get_load_level() == scheduler.CRITICAL:
             if cpu_util_avg <= 40:
                 n_threads = 2
