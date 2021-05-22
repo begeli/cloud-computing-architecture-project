@@ -113,10 +113,10 @@ def main():
         elif cpu_util_total > 380:
             if mc_utilization > 90:
                 # reduce to 2 cores
-                sched.remove(sched.get_load_level() - 2)
+                sched.remove(sched.get_core_usage() - 2)
             if mc_utilization > 180:
                 # reduce to 1 core
-                sched.remove(sched.get_load_level() - 1)
+                sched.remove(sched.get_core_usage() - 1)
 
         # if sched.get_load_level() == scheduler.NORMAL:
         #     if cpu_util_avg > 90.0:
