@@ -82,7 +82,7 @@ def main():
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 2)
                 sched.NORMAL_to_HIGH()
         elif sched.get_load_level() == scheduler.HIGH:
-            if cpu_util_one <= 60:
+            if cpu_util_avg <= 60:
                 # change to 1 core
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 1)
                 sched.HIGH_to_NORMAL()
