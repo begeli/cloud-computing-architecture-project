@@ -28,15 +28,15 @@ def set_memcached_cpu(pid, no_of_cpus):
     return pid, no_of_cpus
 
 
-dedup = ("1",
+dedup = ("1,2,3",
          "dedup",
          "anakli/parsec:dedup-native-reduced",
          "./bin/parsecmgmt -a run -p dedup -i native -n 1")
-fft = ("1",
+fft = ("1,2,3",
        "splash2x-fft",
        "anakli/parsec:splash2x-fft-native-reduced",
        "./bin/parsecmgmt -a run -p splash2x.fft -i native -n 1")
-blackscholes = ("1",
+blackscholes = ("1,2,3",
                 "blackscholes",
                 "anakli/parsec:blackscholes-native-reduced",
                 "./bin/parsecmgmt -a run -p blackscholes -i native -n 1")
@@ -72,17 +72,17 @@ def main():
         if i == 0:
             sched.print_queues()
         i= (i + 1)%20
+
         cpu_utilizations = psutil.cpu_percent(interval=None, percpu=True)
-        cpu_util_avg = cpu_utilizations[0] \
-            if mc_ncpus == 1 \
-            else (cpu_utilizations[0] + cpu_utilizations[1]) / 2.0
+        cpu_util_avg = (cpu_utilizations[0] + cpu_utilizations[1]) / 2.0
+        cpu_util_one = cpu_utilizations[0]
 
         if sched.get_load_level() == scheduler.NORMAL:
-            if cpu_util_avg > 90.0:
+            if cpu_util_one > 90.0:
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 2)
                 sched.NORMAL_to_HIGH()
         elif sched.get_load_level() == scheduler.HIGH:
-            if cpu_util_avg <= 60:
+            if cpu_util_one <= 60:
                 # change to 1 core
                 mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, 1)
                 sched.HIGH_to_NORMAL()
