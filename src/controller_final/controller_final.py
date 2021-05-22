@@ -113,9 +113,6 @@ def main():
 
         elif sched.get_load_level() == scheduler.HIGH:
             if cpu_util_avg <= 40:
-                # change to 1 core
-                n_threads = 1
-                mc_pid, mc_ncpus = set_memcached_cpu(mc_pid, n_threads, logger)
                 sched.HIGH_to_MEDIUM()
             elif cpu_util_avg >= 95.0:
                 # stop all containers
