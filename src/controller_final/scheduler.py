@@ -27,6 +27,9 @@ class ContainerScheduler:
     def get_load_level(self):
         return self.__load_level
 
+    def get_running(self):
+        return self.__running
+
     def get_core_usage(self):
         return self.__running[0] + 2 * self.__running[1] + 3 * self.__running[2]
 
@@ -181,13 +184,13 @@ class ContainerScheduler:
     def add(self, n_containers):
         for q in self.get_best_distribution(n_containers):
             if q == 3:
-                self.start_or_unpause_container(self.__queue3[self.__running[2]-1])
+                self.start_or_unpause_container(self.__queue3[self.__running[2]])
                 self.__running[2] += 1
             if q == 2:
-                self.start_or_unpause_container(self.__queue2[self.__running[1]-1])
+                self.start_or_unpause_container(self.__queue2[self.__running[1]])
                 self.__running[1] += 1
             if q == 1:
-                self.start_or_unpause_container(self.__queue1[self.__running[0]-1])
+                self.start_or_unpause_container(self.__queue1[self.__running[0]])
                 self.__running[0] += 1
 
     def remove(self, n_containers):

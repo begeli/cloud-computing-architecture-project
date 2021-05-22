@@ -93,6 +93,7 @@ def main():
     while True:
         if i == 0:
             sched.print_queues()
+            print("running from queues", sched.get_running())
         i = (i + 1) % 20
 
         mc_utilization = mc_proc.cpu_percent()
