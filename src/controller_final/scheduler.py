@@ -176,6 +176,7 @@ class ContainerScheduler:
         if max >= 1:
             if self.__queue1:
                 return [1]
+        return []
 
     def add(self, n_containers):
         for q in self.get_best_distribution(n_containers):
