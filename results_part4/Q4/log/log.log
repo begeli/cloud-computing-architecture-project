@@ -1,0 +1,8 @@
+timestamp, process name, event
+1621673886.3829648, controller, START
+1621673899.793527, ferret, START
+1621673920.3864877, memchached, 1
+1621673940.3864877, memchached, 2
+1621673953.3864877, memchached, 1
+1621673988.793527, ferret, START
+1621674345.3864877, memchached, 3
