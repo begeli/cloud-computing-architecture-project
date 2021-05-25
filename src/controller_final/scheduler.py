@@ -1,7 +1,6 @@
 import docker
 
 NORMAL = "normal"
-MEDIUM = "medium"
 HIGH = "high"
 CRITICAL = "critical"
 
@@ -34,107 +33,16 @@ class ContainerScheduler:
     def get_core_usage(self):
         return self.__running[0] + 2 * self.__running[1] + 3 * self.__running[2]
 
-    def can_schedule_queue1(self):
-        return len(self.__queue1) > self.__running[0]
+    def can_schedule_queue1(self, num=1):
+        return len(self.__queue1) >= (self.__running[0] + num)
 
-    def can_schedule_queue2(self):
-        return len(self.__queue2) > self.__running[1]
+    def can_schedule_queue2(self, num=1):
+        return len(self.__queue2) >= (self.__running[1] + num)
 
-    def can_schedule_queue3(self):
-        return len(self.__queue3) > self.__running[2]
+    def can_schedule_queue3(self, num=1):
+        return len(self.__queue3) >= (self.__running[2] + num)
 
-    def NORMAL_to_MEDIUM(self):
-        print("switching to MEDIUM")
-        self.__load_level = MEDIUM
 
-    def MEDIUM_to_NORMAL(self):
-        print("switching to NORMAL")
-        self.__load_level = NORMAL
-
-    def MEDIUM_to_HIGH(self):
-        print("switching to HIGH")
-        self.__load_level = HIGH
-        if self.__running == [0, 0, 1]:
-            # If there are only jobs in q3 left, we don't want want to stop it.
-            if not self.__queue1 and not self.__queue2:
-                self.update_container(self.__queue3[0], "2,3")
-                return
-
-            self.pause_container(self.__queue3[0])
-            if self.__queue2:
-                self.start_or_unpause_container(self.__queue2[0])
-                self.__running = [0, 1, 0]
-            else:
-                if self.__queue1:
-                    self.start_or_unpause_container(self.__queue1[0])
-                    self.__running = [1, 0, 0]
-                if len(self.__queue1) >= 2:
-                    self.start_or_unpause_container(self.__queue1[1])
-                    self.__running = [2, 0, 0]
-
-        elif self.__running == [1, 1, 0]:
-            self.pause_container(self.__queue1[0])
-            self.__running = [0, 1, 0]
-
-        elif self.__running == [3, 0, 0]:
-            self.pause_container(self.__queue1[2])
-            self.__running = [2, 0, 0]
-
-    def HIGH_to_MEDIUM(self):
-        print("switching to MEDIUM")
-        self.__load_level = NORMAL
-        if self.__running == [0, 1, 0]:
-            if self.__queue3:
-                self.pause_container(self.__queue2[0])
-                self.start_or_unpause_container(self.__queue3[0])
-                self.__running = [0, 0, 1]
-            elif self.__queue1:
-                self.start_or_unpause_container(self.__queue1[0])
-                self.__running = [1, 1, 0]
-        elif self.__running == [2, 0, 0]:
-            if self.__queue3:
-                self.pause_container(self.__queue1[0])
-                self.pause_container(self.__queue1[1])
-                self.start_or_unpause_container(self.__queue3[0])
-                self.__running = [0, 0, 1]
-            if len(self.__queue1) >= 3:
-                self.start_or_unpause_container(self.__queue1[2])
-                self.__running = [3, 0, 0]
-
-        # This is a special case when all other jobs are done.
-        elif self.__running == [0, 0, 1]:
-            self.update_container(self.__queue3[0], "1,2,3")
-
-    def HIGH_to_CRITICAL(self):
-        print("switching to CRITICAL")
-        self.__load_level = CRITICAL
-        # allow memcached to use all cpus.
-        if self.__running == [0, 1, 0]:
-            self.pause_container(self.__queue2[0])
-        elif self.__running == [2, 0, 0]:
-            self.pause_container(self.__queue1[0])
-            self.pause_container(self.__queue1[1])
-        elif self.__running == [1, 0, 0]:
-            self.pause_container(self.__queue1[0])
-        elif self.__running == [0, 0, 1]:
-            self.pause_container(self.__queue3[0])
-        self.__running = [0, 0, 0]
-
-    def CRITICAL_to_HIGH(self):
-        print("switching to HIGH")
-        self.__load_level = HIGH
-        if self.__queue2:
-            self.unpause_container(self.__queue2[0])
-            self.__running = [0, 1, 0]
-        elif self.__queue1:
-            self.unpause_container(self.__queue1[0])
-            self.__running = [1, 0, 0]
-            if len(self.__queue1) >= 2:
-                self.unpause_container(self.__queue1[1])
-                self.__running = [2, 0, 0]
-        elif self.__queue3:
-            self.unpause_container(self.__queue3[0])
-            self.__running = [0, 0, 1]
 
     def REMOVE_EXITED_CONTAINERS(self):
         # Remove exited containers.
@@ -148,17 +56,97 @@ class ContainerScheduler:
             else:
                 pop_location += 1
 
-        if self.__running[1] == 1:
-            removed = self.remove_if_done_container(self.__queue2[0])
+        pop_location = 0
+        running = self.__running[1]
+        for x in range(0, running):
+            removed = self.remove_if_done_container(self.__queue2[pop_location])
             if removed:
-                self.__queue2.pop(0)
-                self.__running[1] = 0
+                self.__running[1] -= 1
+                self.__queue2.pop(pop_location)
+            else:
+                pop_location += 1
 
-        if self.__running[2] == 1:
-            removed = self.remove_if_done_container(self.__queue3[0])
+        pop_location = 0
+        running = self.__running[2]
+        for x in range(0, running):
+            removed = self.remove_if_done_container(self.__queue3[pop_location])
             if removed:
-                self.__queue3.pop(0)
-                self.__running[2] = 0
+                self.__running[2] -= 1
+                self.__queue3.pop(pop_location)
+            else:
+                pop_location += 1
+
+    def get_best_distribution(self, max):
+        if max >= 4:
+            if self.can_schedule_queue3() and self.can_schedule_queue1():
+                return [3, 1]
+            if self.can_schedule_queue2(2):
+                return [2, 2]
+            if self.can_schedule_queue2() and self.can_schedule_queue1(2):
+                return [2, 1, 1]
+            if self.can_schedule_queue1(4):
+                return [1, 1, 1, 1]
+
+        if max >= 3:
+            if self.can_schedule_queue3():
+                return [3]
+            if self.can_schedule_queue2() and self.can_schedule_queue1():
+                return [2, 1]
+            if self.can_schedule_queue1(3):
+                return [1, 1, 1]
+
+        if max >= 2:
+            if self.can_schedule_queue2():
+                return [2]
+            if self.can_schedule_queue1(2):
+                return [1, 1]
+
+        if max >= 1:
+            if self.can_schedule_queue1():
+                return [1]
+            if self.can_schedule_queue2():
+                return [2]
+            if self.can_schedule_queue3():
+                return [3]
+        return []
+
+    def add(self, n_containers):
+        print("trying to run ", n_containers, " more instances.")
+        distr = self.get_best_distribution(n_containers)
+        print("best distr ", distr)
+        for q in distr:
+            if q == 3:
+                self.start_or_unpause_container(self.__queue3[self.__running[2]])
+                self.__running[2] += 1
+            if q == 2:
+                print("add(2)", len(self.__queue2), " ", self.__running)
+                self.start_or_unpause_container(self.__queue2[self.__running[1]])
+                self.__running[1] += 1
+            if q == 1:
+                self.start_or_unpause_container(self.__queue1[self.__running[0]])
+                self.__running[0] += 1
+
+    def remove(self, n_containers):
+        if n_containers <= 0:
+            return
+        weight = 3
+        queues = [self.__queue1, self.__queue2, self.__queue3]
+        for n in reversed(self.__running):
+            for i in reversed(range(0, n)):
+                if n_containers > weight:
+                    n_containers -= weight
+                    self.__running[weight - 1] -= 1
+                    self.pause_container(queues[weight - 1][i])
+            weight -= 1
+
+        print("going into the removal loop")
+        while n_containers > 0 and self.get_core_usage() > 0:
+            for w, n in enumerate(self.__running):
+                for pos_in_queue in range(0, n):
+                    n_containers -= (w + 1)
+                    self.__running[w] -= 1
+                    self.pause_container(queues[w][pos_in_queue])
+        print("yay it returned")
 
     def SCHEDULE_NEXT(self):
         if self.__load_level == NORMAL:
@@ -190,12 +178,13 @@ class ContainerScheduler:
                 self.__running = [0, 0, 1]
 
     def DONE(self):
-        return self.__running == [0, 0, 0] and not self.__queue1 and not self.__queue2 and not self.__queue3
+        return self.__running == [0, 0,
+                                  0] and not self.__queue1 and not self.__queue2 and not self.__queue3
 
     def print_queues(self):
         print("queue1", [c.name for c in self.__queue1], end="  ")
         print("queue2", [c.name for c in self.__queue2], end="  ")
-        print("queue3", [c.name for c in self.__queue3], end=50 * " " + "\r")
+        print("queue3", [c.name for c in self.__queue3], end="\n")
 
     # Container management helpers.
 
@@ -316,3 +305,90 @@ class ContainerScheduler:
             self.hard_remove_container(self.__client.containers.get("ferret"))
         except:
             print("Tried to remove Ferret, but didn't exist.")
+
+    # Old version using different execution stages.
+
+    # def NORMAL_to_HIGH(self):
+    #     print("switching to HIGH")
+    #     self.__load_level = HIGH
+    #     if self.__running == [0, 0, 1]:
+    #         # If there are only jobs in q3 left, we don't want want to stop it.
+    #         if not self.__queue1 and not self.__queue2:
+    #             self.update_container(self.__queue3[0], "2,3")
+    #             return
+    #
+    #         self.pause_container(self.__queue3[0])
+    #         if self.__queue2:
+    #             self.start_or_unpause_container(self.__queue2[0])
+    #             self.__running = [0, 1, 0]
+    #         else:
+    #             if self.__queue1:
+    #                 self.start_or_unpause_container(self.__queue1[0])
+    #                 self.__running = [1, 0, 0]
+    #             if len(self.__queue1) >= 2:
+    #                 self.start_or_unpause_container(self.__queue1[1])
+    #                 self.__running = [2, 0, 0]
+    #
+    #     elif self.__running == [1, 1, 0]:
+    #         self.pause_container(self.__queue1[0])
+    #         self.__running = [0, 1, 0]
+    #
+    #     elif self.__running == [3, 0, 0]:
+    #         self.pause_container(self.__queue1[2])
+    #         self.__running = [2, 0, 0]
+    #
+    # def HIGH_to_NORMAL(self):
+    #     print("switching to NORMAL")
+    #     self.__load_level = NORMAL
+    #     if self.__running == [0, 1, 0]:
+    #         if self.__queue3:
+    #             self.pause_container(self.__queue2[0])
+    #             self.start_or_unpause_container(self.__queue3[0])
+    #             self.__running = [0, 0, 1]
+    #         elif self.__queue1:
+    #             self.start_or_unpause_container(self.__queue1[0])
+    #             self.__running = [1, 1, 0]
+    #     elif self.__running == [2, 0, 0]:
+    #         if self.__queue3:
+    #             self.pause_container(self.__queue1[0])
+    #             self.pause_container(self.__queue1[1])
+    #             self.start_or_unpause_container(self.__queue3[0])
+    #             self.__running = [0, 0, 1]
+    #         if len(self.__queue1) >= 3:
+    #             self.start_or_unpause_container(self.__queue1[2])
+    #             self.__running = [3, 0, 0]
+    #
+    #     # This is a special case when all other jobs are done.
+    #     elif self.__running == [0, 0, 1]:
+    #         self.update_container(self.__queue3[0], "1,2,3")
+    #
+    # def HIGH_to_CRITICAL(self):
+    #     print("switching to CRITICAL")
+    #     self.__load_level = CRITICAL
+    #     # allow memcached to use all cpus.
+    #     if self.__running == [0, 1, 0]:
+    #         self.pause_container(self.__queue2[0])
+    #     elif self.__running == [2, 0, 0]:
+    #         self.pause_container(self.__queue1[0])
+    #         self.pause_container(self.__queue1[1])
+    #     elif self.__running == [1, 0, 0]:
+    #         self.pause_container(self.__queue1[0])
+    #     elif self.__running == [0, 0, 1]:
+    #         self.pause_container(self.__queue3[0])
+    #     self.__running = [0, 0, 0]
+    #
+    # def CRITICAL_to_HIGH(self):
+    #     print("switching to HIGH")
+    #     self.__load_level = HIGH
+    #     if self.__queue2:
+    #         self.unpause_container(self.__queue2[0])
+    #         self.__running = [0, 1, 0]
+    #     elif self.__queue1:
+    #         self.unpause_container(self.__queue1[0])
+    #         self.__running = [1, 0, 0]
+    #         if len(self.__queue1) >= 2:
+    #             self.unpause_container(self.__queue1[1])
+    #             self.__running = [2, 0, 0]
+    #     elif self.__queue3:
+    #         self.unpause_container(self.__queue3[0])
+    #         self.__running = [0, 0, 1]
