@@ -40,7 +40,7 @@ def set_memcached_cpu(pid, no_of_cpus, logger):
     print(f'Setting Memcached CPU affinity to {cpu_affinity}')
     command = f'sudo taskset -a -cp {cpu_affinity} {pid}'
     logger.log_memchached_state(no_of_cpus)
-    subprocess.run(command.split(" "))
+    subprocess.run(command.split(" "), stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     return pid, no_of_cpus
 
 
@@ -111,10 +111,10 @@ def main():
             sched.add(1)
 
         elif cpu_util_total > 380:
-            if mc_utilization > 90:
+            if mc_utilization > 80:
                 # reduce to 2 cores
                 sched.remove(sched.get_core_usage() - 3)
-            if mc_utilization > 180:
+            if mc_utilization > 170:
                 # reduce to 1 core
                 sched.remove(sched.get_core_usage() - 2)
 
