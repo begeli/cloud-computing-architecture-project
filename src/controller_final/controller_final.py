@@ -30,7 +30,9 @@ def init_memcached_config(logger):
         if process_name in proc.name():
             pid = proc.pid
             break
-
+    
+    #command = f"sudo renice -n -19 -p {pid}"
+    #subprocess.run(command.split(" "), stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     # Set the cpu affinity of memcached to CPU 0
     return set_memcached_cpu(pid, 4, logger)
 
@@ -74,6 +76,9 @@ def main():
     if not args.log_path or args.log_path is None:
         raise ValueError("please provide --log_path PATH_TO_LOG_FILE.")
 
+    #command = "sudo systemctl restart docker"
+    #subprocess.run(command.split(" "), stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
     q1_conf = [dedup, fft]
     q2_conf = [canneal, freqmine, blackscholes]
     q3_conf = [ferret]
@@ -111,10 +116,10 @@ def main():
             sched.add(1)
 
         elif cpu_util_total > 380:
-            if mc_utilization > 80:
+            if mc_utilization > 60:
                 # reduce to 2 cores
                 sched.remove(sched.get_core_usage() - 3)
-            if mc_utilization > 170:
+            if mc_utilization > 150:
                 # reduce to 1 core
                 sched.remove(sched.get_core_usage() - 2)
 
