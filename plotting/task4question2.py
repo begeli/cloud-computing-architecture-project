@@ -13,7 +13,7 @@ def main():
 
     for run in ['T2_C1', 'T2_C2']:
         num_cores = int(run[-1])
-        fig, ax = plt.subplots(figsize=(6, 6), dpi=80)
+        fig, ax = plt.subplots(figsize=(5, 5), dpi=80)
         ax.set_ylabel("95th Percentile Latency [ms]")
 
         ax.set_xlabel("Measured Queries Per Second")
@@ -57,7 +57,7 @@ def main():
         df.plot(x='QPS', y='cpu_util', ax=ax_cpu, legend=False, color='tab:blue')
         ax.figure.legend([ax, ax_cpu],
                          labels=['95th perc. latency', 'CPU utilization'],
-                         bbox_to_anchor=(0.88, 0.21),
+                         bbox_to_anchor=(0.88, 0.23),
                          bbox_transform=plt.gcf().transFigure)
         ax.plot([0, 105000], [2, 2], linestyle=':', color='grey')
         # plt.show()

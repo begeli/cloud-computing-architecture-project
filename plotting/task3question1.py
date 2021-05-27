@@ -15,9 +15,6 @@ def get_start_end(path):
 def get_events(df: pd.DataFrame):
     workload_df = df[
         df['process name'].isin(['ferret', 'dedup', 'canneal', 'freqmine', 'splash2x-fft', 'blackscholes'])]
-    # workload_df = workload_df[
-    #     workload_df['event'].isin(['START', 'FINISH', ''])
-    # ]
     return workload_df
 
 
@@ -32,31 +29,27 @@ def get_time_for_job(df, name):
 
 
 def main():
-    jobs = ['dedup', 'blackscholes', 'ferret', 'freqmine', 'canneal', 'splash2x-fft', 'controller']
+    jobs = ['dedup', 'blackscholes', 'ferret', 'freqmine', 'canneal', 'splash2x-fft', 'total time']
     runtimes = {name: [] for name in jobs}
-    for run in range(1, 4):
-        latency_path = f'../results_part4/Q4/latency/mc_perf-out-{run}-60-150.txt'
-        df_lat = pd.read_csv(latency_path, delim_whitespace=True,
-                             skiprows=7, skipfooter=11, engine='python')  # maybe skipfooter=9
-        time_start, time_end = get_start_end(latency_path)
+    for run in range(3):
+        latency_path = f'../results_part3/memcached_latency/latency_{run}.txt'
+        df_lat = pd.read_csv(latency_path, delim_whitespace=True)
         df_lat["p95"] = df_lat["p95"].divide(1000.0)  # convert to ms
-        timestamps = list(range(0, time_end - time_start, 10))
 
-        log_df = pd.read_csv(f'../results_part4/Q4/log/log-{run}-60-150.txt', skipinitialspace=True)
-        controller_time_end = log_df.iloc[-1]['timestamp']
-        controller_time_start = log_df.iloc[0]['timestamp']
+        log_df = pd.read_csv(f'../results_part3/results{run}.csv', skipinitialspace=True)
+        controller_time_end = int(log_df.iloc[-1]['timestamp'])
+        controller_time_start = int(log_df.iloc[-2]['timestamp'])
+        timestamps = list(range(10, controller_time_end - controller_time_start+20, 20))
         log_df['timestamp'] -= controller_time_start
         for name in jobs:
             runtimes[name].append(get_time_for_job(log_df, name))
 
-        df_lat['timestamp'] = list(map(lambda x: x - controller_time_start + time_start, timestamps[:len(df_lat)]))
-
-        memcached_df = log_df[log_df['process name'] == 'memchached']
+        df_lat['timestamp'] = timestamps[:len(df_lat)]
 
         events = get_events(log_df)
 
-        fig = plt.figure(figsize=(16, 12))
-        axA_95p, ax_events, axB_CPU_cores = fig.subplots(3, 1, gridspec_kw={'height_ratios': [3, 1, 3]})
+        fig = plt.figure(figsize=(8, 6))
+        axA_95p, ax_events = fig.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]})
 
         def config_QPS_ax(ax):
             ax.set_ylabel("Queries per second")
@@ -68,6 +61,8 @@ def main():
             ax.grid(True)
             return ax.scatter(df_lat['timestamp'], df_lat['QPS'], color='tab:orange')
 
+        event_labels = [row['process name'] + ": " + row['event'] for _, row in events.iterrows()]
+
         length = int(controller_time_end - controller_time_start)
         # Events plot.
 
@@ -76,7 +71,7 @@ def main():
         ax_events.set_yticklabels(workloads)
         ax_events.set_ylim([-1, 6])
         ax_events.set_xlim([0, length])
-        ax_events.set_xticks(range(0, length + 1, 100))
+        ax_events.set_xticks(range(0, length + 1, 50))
         ax_events.grid(True)
 
         for idx, name in enumerate(workloads):
@@ -92,7 +87,7 @@ def main():
                     break
                 else:
                     ax_events.plot([entries.iloc[i]['timestamp'], entries.iloc[i + 1]['timestamp']],
-                               [idx, idx], color=color, linewidth=3)
+                                   [idx, idx], color=color, linewidth=3)
             ax_events.scatter([entries.iloc[0]['timestamp']], [idx], c=color, marker='o')
             ax_events.scatter([entries.iloc[-1]['timestamp']], [idx], c=color, marker='x')
 
@@ -101,9 +96,8 @@ def main():
         axA_95p.set_title(f"Plot A")
         axA_95p.set_xlim([0, length])
         axA_95p.set_xlabel("Time [s]")
-        axA_95p.set_xticks(range(0, length, 100))
+        axA_95p.set_xticks(range(0, length, 50))
         axA_95p.grid(True)
-        # draw_events(axA_95p)
         axA_95p.set_ylabel("95th Percentile Latency [ms]")
         axA_95p.tick_params(axis='y', labelcolor='tab:blue')
         axA_95p.set_ylim([0, 4.0])
@@ -114,28 +108,11 @@ def main():
         artistA_QPS = config_QPS_ax(axA_QPS)
         axA_QPS.legend([artistA_QPS, artistA_95p], ['QPS', '95 percentile latency'], loc='upper right')
 
-        # Plot B
-        # axB_CPU_cores.set_title(f"Plot B")
-        axB_CPU_cores.set_xlim([0, length])
-        axB_CPU_cores.set_xlabel("Time [s]\nPlot B")
-        axB_CPU_cores.set_xticks(range(0, length, 100))
-        axB_CPU_cores.grid(True)
-        # draw_events(axB_CPU_cores)
-
-        axB_CPU_cores.set_ylabel('Memcached CPU cores')
-        axB_CPU_cores.tick_params(axis='y', labelcolor='tab:green')
-
-        artistB_CPU_cores, = axB_CPU_cores.plot(memcached_df['timestamp'], memcached_df['event'], drawstyle='steps-post', color='tab:green')
-        axB_QPS = axB_CPU_cores.twinx()
-        artistB_QPS = config_QPS_ax(axB_QPS)
-        axB_QPS.legend([artistB_QPS, artistB_CPU_cores], ['QPS', 'Memcached CPU cores'], loc='upper right')
-
         plt.subplots_adjust(hspace=0.2, bottom=0.2)
-        # plt.subplots_adjust(hspace=1.0, bottom=0.2)
         fig.tight_layout()
 
         # plt.show()
-        plt.savefig(f'plots/task4question4-{run}.pdf', bbox_inches='tight')
+        plt.savefig(f'plots/task4question3-{run}.pdf', bbox_inches='tight')
 
     name_map = {'splash2x-fft': 'fft', 'controller': 'total time'}
     print(runtimes)
