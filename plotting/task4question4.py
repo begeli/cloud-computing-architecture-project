@@ -21,19 +21,34 @@ def get_events(df: pd.DataFrame):
     return workload_df
 
 
+def make_stats_entry(name, mean, std):
+    return f'{name} & {mean} & {std} \\\\ \\hline'
+
+
+def get_time_for_job(df, name):
+    start_time = df[(df['process name'] == name) & (df['event'] == 'START')]['timestamp']
+    end_time = df[(df['process name'] == name) & (df['event'] == 'FINISH')]['timestamp']
+    return end_time.item() - start_time.item()
+
+
 def main():
+    jobs = ['dedup', 'blackscholes', 'ferret', 'freqmine', 'canneal', 'splash2x-fft', 'controller']
+    runtimes = {name: [] for name in jobs}
     for run in range(1, 4):
-        latency_path = f'../results_part4/Q4/latency/mcperf_out_{run}.txt'
+        latency_path = f'../results_part4/Q4/latency/mc_perf-out-{run}-60-150.txt'
         df_lat = pd.read_csv(latency_path, delim_whitespace=True,
                              skiprows=7, skipfooter=11, engine='python')  # maybe skipfooter=9
         time_start, time_end = get_start_end(latency_path)
         df_lat["p95"] = df_lat["p95"].divide(1000.0)  # convert to ms
         timestamps = list(range(0, time_end - time_start, 10))
 
-        log_df = pd.read_csv(f'../results_part4/Q4/log/log-{run}.txt', skipinitialspace=True)
+        log_df = pd.read_csv(f'../results_part4/Q4/log/log-{run}-60-150.txt', skipinitialspace=True)
         controller_time_end = log_df.iloc[-1]['timestamp']
         controller_time_start = log_df.iloc[0]['timestamp']
         log_df['timestamp'] -= controller_time_start
+        for name in jobs:
+            runtimes[name].append(get_time_for_job(log_df, name))
+
         df_lat['timestamp'] = list(map(lambda x: x - controller_time_start + time_start, timestamps[:len(df_lat)]))
 
         memcached_df = log_df[log_df['process name'] == 'memchached']
@@ -57,6 +72,7 @@ def main():
             ax.tick_params(axis='y', labelcolor='tab:orange')
             ax.scatter(df_lat['timestamp'], df_lat['QPS'], color='tab:orange')
             ax.grid(True)
+
         event_labels = [row['process name'] + ": " + row['event'] for _, row in events.iterrows()]
 
         length = int(controller_time_end - controller_time_start)
@@ -73,12 +89,19 @@ def main():
         for idx, name in enumerate(workloads):
             entries = events[events['process name'] == name]
             color = f'C{idx}'
+            if len(entries) % 2 == 1:
+                print(f"Something weird happened...: \n{entries.iloc[-2]}\n but no matching action. Skipping.")
+
             for i in range(0, len(entries), 2):
-                ax_events.plot([entries.iloc[i]['timestamp'], entries.iloc[i+1]['timestamp']],
+                if len(entries) % 2 == 1 and i == len(entries) - 3:
+                    ax_events.plot([entries.iloc[i]['timestamp'], entries.iloc[i + 2]['timestamp']],
+                                   [idx, idx], color=color, linewidth=3)
+                    break
+                else:
+                    ax_events.plot([entries.iloc[i]['timestamp'], entries.iloc[i + 1]['timestamp']],
                                [idx, idx], color=color, linewidth=3)
             ax_events.scatter([entries.iloc[0]['timestamp']], [idx], c=color, marker='o')
             ax_events.scatter([entries.iloc[-1]['timestamp']], [idx], c=color, marker='x')
-
 
         # Plot A
         fig.suptitle(f'Run {run} visualization')
@@ -119,8 +142,14 @@ def main():
         # plt.subplots_adjust(hspace=1.0, bottom=0.2)
         fig.tight_layout()
 
-        # plt.show()
-        plt.savefig(f'plots/task4question4-{run}.pdf', bbox_inches='tight')
+        plt.show()
+        # plt.savefig(f'plots/task4question4-{run}.pdf', bbox_inches='tight')
+
+    name_map = {'splash2x-fft': 'fft', 'controller': 'total time'}
+    print(runtimes)
+    for name in jobs:
+        arr = np.array(runtimes[name])
+        print(make_stats_entry(name_map.get(name, name), arr.mean(), arr.std()))
 
 
 if __name__ == "__main__":
