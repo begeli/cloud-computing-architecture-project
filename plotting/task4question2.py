@@ -14,18 +14,21 @@ def main():
     for run in ['T2_C1', 'T2_C2']:
         num_cores = int(run[-1])
         fig, ax = plt.subplots(figsize=(6, 6), dpi=80)
-        ax_cpu = ax.twinx()
         ax.set_ylabel("95th Percentile Latency [ms]")
-        ax_cpu.set_ylabel("Total CPU utilization [%]")
 
         ax.set_xlabel("Measured Queries Per Second")
         ax.set_title(f"{run[1]} threads, {run[4]} cores")
         plt.xlim([0, 105 * 1000])
         ax.set_ylim([0, 2.5])
-        ax_cpu.set_ylim([0, 105 * num_cores])
         ax.set_yticks(np.arange(0, 2.75, 0.5))
+        ax.tick_params(axis='y', labelcolor='tab:orange')
+
         plt.xticks(range(0, 105000, 10000))
         ax.grid(True)
+        ax_cpu = ax.twinx()
+        ax_cpu.set_ylabel("Total CPU utilization [%]")
+        ax_cpu.tick_params(axis='y', labelcolor='tab:blue')
+        ax_cpu.set_ylim([0, 105 * num_cores])
         ax_cpu.grid(True)
 
         ax.xaxis.set_major_formatter(
@@ -50,11 +53,11 @@ def main():
         df = df.sort_values('target')
         df = df[df['QPS'] > df['target'] - 5000]
         df["p95"] = df["p95"].divide(1000.0)
-        df.plot(x='QPS', y='p95', legend=False, ax=ax, color='orange')
-        df.plot(x='QPS', y='cpu_util', ax=ax_cpu, legend=False)
+        df.plot(x='QPS', y='p95', legend=False, ax=ax, color='tab:orange', marker='o')
+        df.plot(x='QPS', y='cpu_util', ax=ax_cpu, legend=False, color='tab:blue')
         ax.figure.legend([ax, ax_cpu],
                          labels=['95th perc. latency', 'CPU utilization'],
-                         bbox_to_anchor=(0.88, 0.19),
+                         bbox_to_anchor=(0.88, 0.21),
                          bbox_transform=plt.gcf().transFigure)
         ax.plot([0, 105000], [2, 2], linestyle=':', color='grey')
         # plt.show()
