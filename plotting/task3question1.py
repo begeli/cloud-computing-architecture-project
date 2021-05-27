@@ -19,7 +19,7 @@ def get_events(df: pd.DataFrame):
 
 
 def make_stats_entry(name, mean, std):
-    return f'{name} & {mean} & {std} \\\\ \\hline'
+    return f'{name} & {mean:.2f} & {std:.2f} \\\\ \\hline'
 
 
 def get_time_for_job(df, name):
@@ -48,13 +48,13 @@ def main():
 
         events = get_events(log_df)
 
-        fig = plt.figure(figsize=(8, 6))
-        axA_95p, ax_events = fig.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]})
+        fig = plt.figure(figsize=(8, 5))
+        axA_95p, ax_events = fig.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1.5]})
 
         def config_QPS_ax(ax):
             ax.set_ylabel("Queries per second")
-            ax.set_ylim([0, 100000])
-            ax.set_yticks(np.arange(0, 100001, 10000))
+            ax.set_ylim([0, 40000])
+            ax.set_yticks(np.arange(0, 40001, 5000))
             ax.yaxis.set_major_formatter(
                 FuncFormatter(lambda x_val, tick_pos: "{:.0f}k".format(x_val / 1000)))
             ax.tick_params(axis='y', labelcolor='tab:orange')
@@ -100,8 +100,8 @@ def main():
         axA_95p.grid(True)
         axA_95p.set_ylabel("95th Percentile Latency [ms]")
         axA_95p.tick_params(axis='y', labelcolor='tab:blue')
-        axA_95p.set_ylim([0, 4.0])
-        axA_95p.set_yticks(np.arange(0, 4.0, 0.4))
+        axA_95p.set_ylim([0, 3.2])
+        axA_95p.set_yticks(np.arange(0, 3.2, 0.4))
 
         artistA_95p, = axA_95p.plot(df_lat['timestamp'], df_lat['p95'], 'o-', color='tab:blue')
         axA_QPS = axA_95p.twinx()
@@ -112,7 +112,7 @@ def main():
         fig.tight_layout()
 
         # plt.show()
-        plt.savefig(f'plots/task4question3-{run}.pdf', bbox_inches='tight')
+        plt.savefig(f'plots/task3question1-{run}.pdf', bbox_inches='tight')
 
     name_map = {'splash2x-fft': 'fft', 'controller': 'total time'}
     print(runtimes)
