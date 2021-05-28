@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parsec-splash2x-fft
+  labels:
+    name: pasec-splash2x-fft
+spec:
+  template:
+    spec:
+      containers:
+      - image: anakli/parsec:splash2x-fft-native-reduced
+        name: parsec-splash2x-fft
+        imagePullPolicy: Always
+        resources: 
+          requests: 
+            memory: "12Gi"
+          limits: 
+            memory: "13Gi"
+        command: ["/bin/sh"]
+        args: ["-c", "taskset -c 2,3 ./bin/parsecmgmt -a run -p splash2x.fft -i native -n 2"]
+      restartPolicy: Never
+      nodeSelector:
+        cca-project-nodetype: "node-b-4core"

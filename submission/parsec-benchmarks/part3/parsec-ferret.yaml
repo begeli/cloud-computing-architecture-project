@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parsec-ferret
+  labels:
+    name: pasec-ferret
+spec:
+  template:
+    spec:
+      containers:
+      - image: anakli/parsec:ferret-native-reduced
+        name: parsecferret
+        imagePullPolicy: Always
+        resources: 
+          requests: 
+            cpu: "6.0"
+          limits: 
+            cpu: "7.0"
+        command: ["/bin/sh"]
+        args: ["-c", "taskset -c 0-6 ./bin/parsecmgmt -a run -p ferret -i native -n 4"]
+      restartPolicy: Never
+      nodeSelector:
+        cca-project-nodetype: "node-c-8core"
