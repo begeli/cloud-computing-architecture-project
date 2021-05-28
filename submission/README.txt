@@ -1,4 +1,4 @@
-This submission folder contains our project report, the controller we written for part 4, the static scheduling policy we have written for part 3 and the modified YAML files. 
+This submission folder contains our project report, the controller we have written for part 4, the static scheduling policy we have written for part 3 and the modified YAML files. 
 
 - src folder contains the script for part 3 and the controller.
 
