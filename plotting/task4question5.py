@@ -3,12 +3,14 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import FuncFormatter
 
+INTERVAL_SECONDS = 8
+
 
 def get_start_end(path):
     with open(path, 'r') as f:
         lines = f.readlines()
-        start_time = float(lines[4].split(sep=' ')[-1])
-        end_time = float(lines[5].split(sep=' ')[-1])
+        start_time = float(lines[3].split(sep=' ')[-1])
+        end_time = float(lines[4].split(sep=' ')[-1])
     return int(start_time / 1000), int(end_time / 1000)
 
 
@@ -35,16 +37,16 @@ def main():
     total_violations = []
     total_datapoints = []
     for run in range(1, 4):
-        latency_path = f'../results_part4/Q4/latency/mc-perf-out-{run}-60-150-s42.txt'
+        latency_path = f'../results_part4/Q5/latency/memcached_{INTERVAL_SECONDS}s_{run}.txt'
         df_lat = pd.read_csv(latency_path, delim_whitespace=True,
-                             skiprows=7, skipfooter=11, engine='python')  # maybe skipfooter=9
+                             skiprows=6, skipfooter=11, engine='python')
         time_start, time_end = get_start_end(latency_path)
         df_lat["p95"] = df_lat["p95"].divide(1000.0)  # convert to ms
         total_datapoints += [len(df_lat)]
         total_violations += [sum(df_lat['p95'] > 2.0)]
-        timestamps = list(range(0, time_end - time_start, 10))
+        timestamps = list(range(0, time_end - time_start, INTERVAL_SECONDS))
 
-        log_df = pd.read_csv(f'../results_part4/Q4/log/log-{run}-60-150-s42.txt', skipinitialspace=True)
+        log_df = pd.read_csv(f'../results_part4/Q5/log/log_{INTERVAL_SECONDS}s_{run}.csv', skipinitialspace=True)
         controller_time_end = log_df.iloc[-1]['timestamp']
         controller_time_start = log_df.iloc[0]['timestamp']
         log_df['timestamp'] -= controller_time_start
@@ -94,7 +96,7 @@ def main():
                     break
                 else:
                     ax_events.plot([entries.iloc[i]['timestamp'], entries.iloc[i + 1]['timestamp']],
-                               [idx, idx], color=color, linewidth=3)
+                                   [idx, idx], color=color, linewidth=3)
             ax_events.scatter([entries.iloc[0]['timestamp']], [idx], c=color, marker='o')
             ax_events.scatter([entries.iloc[-1]['timestamp']], [idx], c=color, marker='x')
 
@@ -104,7 +106,7 @@ def main():
         axA_95p.set_xlim([0, length])
         axA_95p.set_xlabel("Time [s]")
         axA_95p.set_xticks(range(0, length, 100))
-        axA_95p.grid(True)
+        # axA_95p.grid(True)
         # draw_events(axA_95p)
         axA_95p.set_ylabel("95th Percentile Latency [ms]")
         axA_95p.tick_params(axis='y', labelcolor='tab:blue')
@@ -117,12 +119,10 @@ def main():
         axA_QPS.legend([artistA_QPS, artistA_95p], ['QPS', '95 percentile latency'], loc='upper right')
 
         # Plot B
-        # axB_CPU_cores.set_title(f"Plot B")
         axB_CPU_cores.set_xlim([0, length])
         axB_CPU_cores.set_xlabel(f"Time [s]\nPlot {run}B")
         axB_CPU_cores.set_xticks(range(0, length, 100))
         axB_CPU_cores.grid(True)
-        # draw_events(axB_CPU_cores)
 
         axB_CPU_cores.set_ylabel('Memcached CPU cores')
         axB_CPU_cores.tick_params(axis='y', labelcolor='tab:green')
@@ -133,11 +133,10 @@ def main():
         axB_QPS.legend([artistB_QPS, artistB_CPU_cores], ['QPS', 'Memcached CPU cores'], loc='upper right')
 
         plt.subplots_adjust(hspace=0.2, bottom=0.2)
-        # plt.subplots_adjust(hspace=1.0, bottom=0.2)
         fig.tight_layout()
 
         # plt.show()
-        plt.savefig(f'plots/task4question4-{run}.pdf', bbox_inches='tight')
+        plt.savefig(f'plots/task4question5-{run}.pdf', bbox_inches='tight')
 
     name_map = {'splash2x-fft': 'fft', 'controller': 'total time'}
     print(runtimes)
