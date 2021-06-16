@@ -42,4 +42,4 @@
 	This command will start scheduling the PARSEC jobs, so, it is important to start running mc-perf right after this command executes.
 
 
-- NOTE: cpu_ps_util.py is a small script we used to get the cpu utilization numbers for the first 2 questions in part 2.
+- NOTE: cpu_ps_util.py is a small script we used to get the cpu utilization numbers for the first 2 questions in part 4.
