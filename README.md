@@ -2,6 +2,16 @@
 
 This repository contains code, results and reports for the Cloud Computing Architecture course project at ETH Zurich. The project explores how to schedule latency-sensitive and batch applications in a cloud cluster.  
 
+* **Part 1:**
+* **Part 2:**
+* **Part 3:**
+* **Part 4:**
+
+## Results
+
+* The static scheduler for part 3 achieves an SLO of 2ms for 95th percentile latency at 30k QPS.
+* The dynamic scheduler for part 4 achieves an SLO of 2ms for 95th percentile latency for loads varying between 5k QPS and 100k QPS with 8 second intervals in between next waves.
+
 ## Files and Folders 
 
 * `cloud_comp_project_parts1-4.pdf`: This file contains the project description and instructions for setting up the clusters required for the project.
