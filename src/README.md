@@ -2,23 +2,21 @@
 
 - Prior to running the scheduler, the user should create the clusters as specified in the project description. 
 
-- User should manually create the memcache pod by running the YAML file in the memcache folder.
+- User should manually create the memcache pod by running the YAML file (`memcache-t1-cpuset-part3.yaml`) in the memcache folder.
 
 - Then user should run the python script static_schedule.py file inside this folder. (`python3 static_schedule.py` should work just fine.)
 
-- Important note: static_schedule.py hardcodes the path to the YAML files for PARSEC jobs. The user should use the default folder hierarchy or they should ensure the location variable in the script points to the folder that contains the relevant PARSEC jobs.
+- Important note: static_schedule.py hardcodes the path to the YAML files (`parsec-benchmarks/part3`) for PARSEC jobs. The user should use the default folder hierarchy or they should ensure the location variable in the script points to the folder that contains the relevant PARSEC jobs.
 
 - The script will output the scheduled pods and then it will exit. User should manually check if all the pods finished execution by using the get_time.py script of the command line. 
-
-- NOTE: get_time.py is provided by the teaching team and it is unmodified.
 
 # Instructions for running the dynamic controller (Part 4) 
 
 - User should create the cluster as specified in the project description.
 
-- User should setup memcache and mc-perf in the respective machines as described in the project description.
+- User should set up memcache and mc-perf in the respective machines as described in the project description.
 
-- User should set the number of threads used by memcache to 2.
+- User should set the number of threads used by memcache to 2. (Also specified in the project description)
 
 - When the cluster is up and running they should do the following: 
 
@@ -41,6 +39,3 @@
 	`python3 controller_final.py --log_path <Name of the logging File (REQUIRED)>`
 	
 	This command will start scheduling the PARSEC jobs, so, it is important to start running mc-perf right after this command executes.
-
-
-- NOTE: cpu_ps_util.py is a small script we used to get the cpu utilization numbers for the first 2 questions in part 4.
