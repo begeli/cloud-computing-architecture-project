@@ -2,10 +2,10 @@
 
 This repository contains code, results and reports for the Cloud Computing Architecture course project at ETH Zurich. The project explores how to schedule latency-sensitive and batch applications in a cloud cluster.  
 
-* **Part 1:**
-* **Part 2:**
-* **Part 3:**
-* **Part 4:**
+* **Part 1:** Analyze the sensitivity of latency sensitive cloud application (memcache) with various types of resource interference (CPU, L1 instruction and data cache, L2 cache, L3 cache and Memory Bandwidth interference).
+* **Part 2:** Analyze the sensitivity of batch cloud applications (PARSEC) to various types of resource interference (same as part 1) and parallelism. 
+* **Part 3:** Design an interference-aware scheduling policy to run latency-critical and batch applications on shared cluster.
+* **Part 4:** Design an interference-aware scheduling policy to run the latency-critical applications on the same VM.
 
 ## Results
 
