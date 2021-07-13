@@ -14,7 +14,7 @@ This repository contains code, results and reports for the Cloud Computing Archi
 
 ## Files and Folders 
 
-* `cloud_comp_project_parts1-4.pdf`: This file contains the project description and instructions for setting up the clusters required for the project.
+* [`cloud_comp_project_parts1-4.pdf`](https://github.com/begeli/cloud-computing-architecture-project/blob/main/cloud_comp_project_parts1-4.pdf): This file contains the detailed project description and instructions for setting up the clusters required for the project.
 * `interference`: This folder contains the YAML files used induce resource contention in the clusters.
 * `memcache`: This folder contains the YAML files used to set up memcache pod for parts 1 & 3.
 * `parsec-benchmarks`: This folder contains the YAML files used to set up PARSEC pods for parts 2 & 3.
